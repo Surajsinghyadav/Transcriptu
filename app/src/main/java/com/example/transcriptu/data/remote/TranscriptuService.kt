@@ -10,13 +10,13 @@ import retrofit2.http.Query
 interface TranscriptuService {
 
     @GET("api/transcript-with-url?flat_text=true")
-    fun getPlainTranscript(
+    suspend fun getPlainTranscript(
         @Query("url") videoUrl : String,
         @Query("lang") language: String
     ) : PlainTranscript
 
     @GET("api/transcript-with-url?flat_text=false")
-    fun getTimeStampTranscript(
+    suspend fun getTimeStampTranscript(
         @Query("url") videoUrl : String,
         @Query("lang") language: String
     ) : TimeStampTranscript

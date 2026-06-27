@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.example.transcriptu.data.modal.Transcript
 
 data class TranscriptSegment(
     val id: String,
@@ -35,11 +36,10 @@ fun Long.toTimestampString(): String {
  */
 @Composable
 fun TranscriptSegmentCard(
-    segment: TranscriptSegment,
+    segment: Transcript,
     isHighlighted: Boolean = false,
     showTimestamp: Boolean = true,
-    onTimestampClick: ((Long) -> Unit)? = null,
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val backgroundColor = if (isHighlighted)
@@ -63,18 +63,15 @@ fun TranscriptSegmentCard(
             // Timestamp pill
             if (showTimestamp) {
                 TimestampPill(
-                    timestamp = segment.timestampSeconds.toTimestampString(),
-                    onClick = if (onTimestampClick != null) {
-                        { onTimestampClick(segment.timestampSeconds) }
-                    } else null
+                    timestamp = segment.offset,
+                    onClick = {}
                 )
                 Spacer(Modifier.width(12.dp))
-            }
 
             // Text — collapses to 2 lines by default
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = segment.text,
+                    text = segment.text!!,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = if (expanded) Int.MAX_VALUE else 2,
@@ -93,6 +90,9 @@ fun TranscriptSegmentCard(
                     )
                 }
             }
+        }
+
+
         }
     }
 }

@@ -47,7 +47,7 @@ fun LanguagePickerSheet(
     selectedLanguage: TranscriptLanguage,
     onLanguageSelected: (TranscriptLanguage) -> Unit,
     onDismiss: () -> Unit,
-) {
+    ) {
     var searchQuery by remember { mutableStateOf("") }
     val filteredLanguages = remember(searchQuery) {
         if (searchQuery.isBlank()) SupportedLanguages

@@ -1,7 +1,5 @@
-package com.transcriptapp.ui.screens
+package com.example.transcriptu.presentation.screens
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -17,8 +15,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.transcriptapp.ui.components.*
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * Enum for the two toggle options at the top of the input form.
@@ -29,14 +29,7 @@ enum class TimestampOption { WITH_TIMESTAMPS, WITHOUT_TIMESTAMPS }
  * Data holder representing the state surfaced to this screen.
  * (Drive this from your ViewModel in the MVVM layer.)
  */
-data class HomeScreenUiState(
-    val urlInput: String = "",
-    val selectedLanguage: TranscriptLanguage = SupportedLanguages.first(),
-    val timestampOption: TimestampOption = TimestampOption.WITHOUT_TIMESTAMPS,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
-    val urlError: String? = null,
-)
+
 
 /**
  * HomeScreen — The main landing screen.
@@ -49,21 +42,18 @@ data class HomeScreenUiState(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    uiState: HomeScreenUiState,
-    onUrlChange: (String) -> Unit,
-    onLanguageChange: (TranscriptLanguage) -> Unit,
-    onTimestampToggle: (TimestampOption) -> Unit,
-    onFetchClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    transcriptuViewModel: TranscriptuViewModel = koinViewModel(),
+    modifier: Modifier,
+    goToTranscriptScreen: () -> Boolean,
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
+    val uiState by transcriptuViewModel.homeUiState.collectAsState()
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         topBar = { HomeTopBar() }
     ) { innerPadding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -71,28 +61,27 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
+                    HeroSection()
 
-            // Hero section
-            HeroSection()
+                    Spacer(Modifier.height(28.dp))
 
-            Spacer(Modifier.height(28.dp))
+                    // Input card
+                    InputCard(
+                        uiState = uiState,
+                        userEvent = transcriptuViewModel::onEvent,
+                        showLanguagePicker = {
+                            showLanguagePicker = true
+                        },
+                        goToTranscriptScreen = goToTranscriptScreen
+                    )
 
-            // Input card
-            InputCard(
-                uiState = uiState,
-                onUrlChange = onUrlChange,
-                onLanguagePickerOpen = { showLanguagePicker = true },
-                onTimestampToggle = onTimestampToggle,
-                onFetchClick = onFetchClick,
-            )
+                    Spacer(Modifier.height(24.dp))
 
-            Spacer(Modifier.height(24.dp))
+                    // Quick tips section
+                    QuickTipsSection()
 
-            // Quick tips section
-            QuickTipsSection()
+                    Spacer(Modifier.height(24.dp))
 
-            Spacer(Modifier.height(24.dp))
         }
     }
 
@@ -100,7 +89,10 @@ fun HomeScreen(
     if (showLanguagePicker) {
         LanguagePickerSheet(
             selectedLanguage = uiState.selectedLanguage,
-            onLanguageSelected = onLanguageChange,
+            onLanguageSelected = {
+                showLanguagePicker = false
+                transcriptuViewModel.onEvent(UserEvent.LanguageSelected(it))
+            },
             onDismiss = { showLanguagePicker = false }
         )
     }
@@ -169,11 +161,10 @@ private fun HeroSection() {
 
 @Composable
 private fun InputCard(
-    uiState: HomeScreenUiState,
-    onUrlChange: (String) -> Unit,
-    onLanguagePickerOpen: () -> Unit,
-    onTimestampToggle: (TimestampOption) -> Unit,
-    onFetchClick: () -> Unit,
+    uiState: HomeScreenInputs,
+    userEvent: (UserEvent) -> Unit,
+    showLanguagePicker: () -> Unit,
+    goToTranscriptScreen: () -> Boolean,
 ) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
@@ -186,18 +177,20 @@ private fun InputCard(
             // URL field
             AppTextField(
                 value = uiState.urlInput,
-                onValueChange = onUrlChange,
+                onValueChange = {
+                    userEvent(UserEvent.UrlInputChanged(it))
+                },
                 placeholder = "https://youtube.com/watch?v=...",
                 label = "YouTube URL",
                 leadingIcon = Icons.Outlined.Link,
-                isError = uiState.urlError != null,
-                errorMessage = uiState.urlError,
+//                isError = uiState.urlError != null,
+//                errorMessage = uiState.urlError,
                 trailingContent = if (uiState.urlInput.isNotEmpty()) {
                     {
                         AppIconButton(
                             icon = Icons.Outlined.Close,
                             contentDescription = "Clear URL",
-                            onClick = { onUrlChange("") }
+                            onClick = { userEvent(UserEvent.UrlInputChanged("")) }
                         )
                     }
                 } else null,
@@ -205,7 +198,7 @@ private fun InputCard(
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { onFetchClick() })
+                keyboardActions = KeyboardActions(onDone = { userEvent(UserEvent.FetchTranscriptClicked) })
             )
 
             Spacer(Modifier.height(16.dp))
@@ -232,7 +225,7 @@ private fun InputCard(
                     )
                 }
                 OutlinedButton(
-                    onClick = onLanguagePickerOpen,
+                    onClick = showLanguagePicker,
                     shape = MaterialTheme.shapes.medium,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
@@ -257,27 +250,30 @@ private fun InputCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
-            TimestampToggle(
-                selected = uiState.timestampOption,
-                onSelect = onTimestampToggle
-            )
+//            TimestampToggle(
+//                selected = uiState.timestampOption,
+//                onSelect = {
+//                    userEvent(UserEvent.TimeStampSelectionChanged(false))
+//                }
+//            )
 
             Spacer(Modifier.height(20.dp))
 
-            // Error message
-            AnimatedVisibility(visible = uiState.errorMessage != null) {
-                uiState.errorMessage?.let {
-                    ErrorBanner(message = it)
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
+//            // Error message
+//            AnimatedVisibility(visible = uiState.errorMessage != null) {
+//                uiState.errorMessage?.let {
+//                    ErrorBanner(message = it)
+//                    Spacer(Modifier.height(12.dp))
+//                }
+//            }
 
             // CTA button
             PrimaryButton(
                 text = "Fetch Transcript",
-                onClick = onFetchClick,
-                isLoading = uiState.isLoading,
-                leadingIcon = if (!uiState.isLoading) Icons.Outlined.Download else null,
+                onClick = {
+                    goToTranscriptScreen()
+                    userEvent(UserEvent.FetchTranscriptClicked)
+                          },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large
             )
@@ -385,7 +381,7 @@ private fun QuickTipsSection() {
 @Composable
 private fun StepRow(
     step: Int,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     description: String,
 ) {

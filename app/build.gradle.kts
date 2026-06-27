@@ -1,16 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10"
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
     namespace = "com.example.transcriptu"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.example.transcriptu"
@@ -27,7 +23,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -67,12 +63,22 @@ dependencies {
     implementation(libs.okhttp)
 
     //koin
-    implementation("io.insert-koin:koin-android:4.2.1")
-    implementation("io.insert-koin:koin-androidx-compose:4.2.1")
+    implementation(libs.koin.android)
+    implementation(libs.koin.androidx.compose)
 
     //Navigation
     implementation(libs.androidx.navigation3.runtime)
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.compose.material.icons.extended)
+
+    // jsoup
+    implementation(libs.jsoup)
+
+    //coil
+
+    implementation(
+        libs.coil.compose)
+
+    implementation(libs.logging.interceptor)
 
 }
