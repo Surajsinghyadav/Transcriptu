@@ -80,5 +80,6 @@ dependencies {
         libs.coil.compose)
 
     implementation(libs.logging.interceptor)
+    implementation(libs.androidx.datastore.preferences)
 
 }

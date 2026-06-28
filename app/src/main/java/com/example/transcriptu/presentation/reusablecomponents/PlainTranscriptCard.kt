@@ -1,53 +1,53 @@
 package com.example.transcriptu.presentation.reusablecomponents
 
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccessTime
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.example.transcriptu.data.modal.PlainTranscript
-import com.example.transcriptu.data.modal.Transcript
+import com.example.transcriptu.ui.theme.TranscriptuTheme
 
 @Composable
 fun PlainTranscriptCard(
     transcript: String,
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium),
+            .clip(CutCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 12.dp, bottomEnd = 12.dp)),
         color = MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.Top
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
         ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = transcript,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = Int.MAX_VALUE,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Visible
-                    )
-
-                }
-            }
-
-
+            Text(
+                text = transcript,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = Int.MAX_VALUE,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Visible
+            )
         }
     }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PlainTranscriptCardPreview() {
+    TranscriptuTheme {
+        PlainTranscriptCard(
+            transcript = "This is a sample transcript that demonstrates the layout of the PlainTranscriptCard. It should wrap text correctly and have proper padding inside the surface.",
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}

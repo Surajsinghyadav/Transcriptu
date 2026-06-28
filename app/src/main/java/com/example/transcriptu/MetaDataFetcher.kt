@@ -22,7 +22,7 @@ class MetaDataFetcher {
         val document = Jsoup.parse(html)
 
         val title = document.select("meta[property=og:title]").first()?.attr("content")
-        val description = document.select("meta[propert=og:description]").first()?.attr("content")
+        val description = document.select("meta[property=og:description]").first()?.attr("content")
         val thumbnailUrl = document.select("meta[property=og:image]").first()?.attr("content")
         return MetaData(
             title = title?.ifEmpty { null },

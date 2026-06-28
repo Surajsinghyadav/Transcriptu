@@ -1,9 +1,7 @@
 package com.example.transcriptu.data.remote
 
-import android.R
 import com.example.transcriptu.data.modal.PlainTranscript
 import com.example.transcriptu.data.modal.TimeStampTranscript
-import org.intellij.lang.annotations.Language
 import retrofit2.http.GET
 import retrofit2.http.Query
 

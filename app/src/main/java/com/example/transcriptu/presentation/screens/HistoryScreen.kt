@@ -1,4 +1,4 @@
-package com.transcriptapp.ui.screens
+package com.example.transcriptu.presentation.screens
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -15,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.transcriptapp.ui.components.*
 
@@ -159,7 +162,7 @@ private fun HistoryEmptyState(modifier: Modifier = Modifier) {
                 text = "Transcripts you fetch will appear here so you can revisit them any time.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -207,9 +210,9 @@ private fun HistorySkeletonCard() {
 
 @Composable
 private fun SkeletonRect(
-    width: androidx.compose.ui.unit.Dp = 0.dp,
-    height: androidx.compose.ui.unit.Dp,
-    shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.extraSmall,
+    width: Dp = 0.dp,
+    height: Dp,
+    shape: Shape = MaterialTheme.shapes.extraSmall,
     fillMaxWidth: Boolean = false,
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "hist_shimmer")

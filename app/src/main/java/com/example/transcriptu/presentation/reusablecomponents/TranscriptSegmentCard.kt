@@ -18,22 +18,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.transcriptu.data.modal.Transcript
 
-data class TranscriptSegment(
-    val id: String,
-    val timestampSeconds: Long,
-    val text: String,
-)
-
-fun Long.toTimestampString(): String {
-    val minutes = this / 60
-    val seconds = this % 60
-    return "%02d:%02d".format(minutes, seconds)
+fun String.offsetToFormattedTimestamp(): String {
+    val totalSeconds = this.toDoubleOrNull()?.toLong() ?: return this
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        "%d:%02d:%02d".format(hours, minutes, seconds)
+    } else {
+        "%02d:%02d".format(minutes, seconds)
+    }
 }
 
-/**
- * A single transcript segment row with timestamp pill and expandable full text.
- * Tapping the row toggles expansion.
- */
 @Composable
 fun TranscriptSegmentCard(
     segment: Transcript,
@@ -60,25 +56,23 @@ fun TranscriptSegmentCard(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Timestamp pill
             if (showTimestamp) {
                 TimestampPill(
-                    timestamp = segment.offset,
+                    timestamp = segment.offset.offsetToFormattedTimestamp(),
                     onClick = {}
                 )
                 Spacer(Modifier.width(12.dp))
-
-            // Text — collapses to 2 lines by default
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = segment.text!!,
+                    text = segment.text.orEmpty(),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = if (expanded) Int.MAX_VALUE else 2,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 AnimatedVisibility(
-                    visible = segment.text.length > 120 && !expanded,
+                    visible = (segment.text?.length ?: 0) > 120 && !expanded,
                     enter = expandVertically(tween(200)),
                     exit = shrinkVertically(tween(200))
                 ) {
@@ -91,9 +85,6 @@ fun TranscriptSegmentCard(
                 }
             }
         }
-
-
-        }
     }
 }
 
@@ -102,13 +93,12 @@ fun TimestampPill(
     timestamp: String,
     onClick: (() -> Unit)? = null,
 ) {
-    val modifier = if (onClick != null)
+    val pillModifier = if (onClick != null)
         Modifier.clickable(onClick = onClick)
-    else
-        Modifier
+    else Modifier
 
     Box(
-        modifier = modifier
+        modifier = pillModifier
             .clip(RoundedCornerShape(6.dp))
             .background(MaterialTheme.colorScheme.primaryContainer)
             .padding(horizontal = 8.dp, vertical = 4.dp),

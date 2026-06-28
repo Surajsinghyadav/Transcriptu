@@ -1,4 +1,4 @@
-package com.transcriptapp.ui.screens
+package com.example.transcriptu.presentation.screens
 
 import android.util.Log
 import androidx.compose.animation.*
@@ -18,55 +18,43 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.example.transcriptu.data.modal.Transcript
 import com.example.transcriptu.presentation.reusablecomponents.PlainTranscriptCard
-import com.example.transcriptu.presentation.screens.TranscriptNetworkState
-import com.example.transcriptu.presentation.screens.TranscriptuViewModel
-import com.example.transcriptu.presentation.screens.UserEvent
 import com.transcriptapp.ui.components.*
-import org.koin.androidx.compose.koinViewModel
 
-/**
- * UiState for the transcript detail screen.
- */
 data class TranscriptDetailUiState(
     val videoTitle: String = "",
     val description: String = "",
-    val thumbnailUrl : String? = null,
-    val videoUrl : String = "",
+    val thumbnailUrl: String? = null,
+    val videoUrl: String = "",
     val channelName: String = "",
     val language: TranscriptLanguage = SupportedLanguages.first(),
     val transcriptSegment: List<Transcript> = emptyList(),
     val isLoading: Boolean = true,
-    val isTranscriptNotAvailable : Boolean = false,
-    val apiErrorMessage : String = ""
+    val isTranscriptNotAvailable: Boolean = false,
+    val apiErrorMessage: String = ""
 )
 
-/**
- * TranscriptDetailScreen — Full transcript viewer.
- *
- * Shows the fetched transcript with segment cards.
- * Users can copy, share, or toggle timestamp visibility.
- * Top bar has a back button to return to HomeScreen.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TranscriptDetailScreen(
     onBackClick: () -> Unit,
-    onCopyAllClick: () -> Unit,
-    onShareClick: () -> Unit,
-    onTimestampClick: (Long) -> Unit,
-    modifier: Modifier = Modifier,
-    transcriptuViewModel: TranscriptuViewModel = koinViewModel(),
+    onShareClick: () -> Unit = {},
+    onTimestampClick: (Long) -> Unit = {},
+    transcriptuViewModel: TranscriptuViewModel,
 ) {
     val uiState by transcriptuViewModel.transcriptDetailUiState.collectAsStateWithLifecycle()
     val networkState by transcriptuViewModel.networkUiState.collectAsStateWithLifecycle()
+    val copySuccess by transcriptuViewModel.copySuccess.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
     var showTimestamps by remember { mutableStateOf(false) }
@@ -78,36 +66,35 @@ fun TranscriptDetailScreen(
         }
     }
 
-    val plainTranscript by remember(filteredSegments, searchQuery) {
-        if (uiState.isTranscriptNotAvailable){
-            mutableStateOf(uiState.description)
-        }else{
-            mutableStateOf(filteredSegments.joinToString(" ") {
-                it.text.toString()
-            })
-        }
-
+    val plainTranscript = remember( uiState, filteredSegments) {
+            if (uiState.isTranscriptNotAvailable) {
+                uiState.description
+            } else {
+                filteredSegments.joinToString(" ") { it.text.toString() }
+            }
     }
 
-    Log.e("description", plainTranscript)
+    Log.d("description", plainTranscript)
     val listState = rememberLazyListState()
 
 
     Scaffold(
-        modifier = modifier,
+        modifier = Modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TranscriptTopBar(
                 title = uiState.videoTitle,
                 channelName = uiState.channelName,
                 onBackClick = onBackClick,
-                onCopyClick = onCopyAllClick,
+                onCopyClick = {
+                    transcriptuViewModel.copyTranscript(context, showTimestamps)
+                },
                 onShareClick = onShareClick,
                 onSearchClick = { showSearchBar = !showSearchBar },
+                copySuccess = copySuccess
             )
         },
         floatingActionButton = {
-            // Scroll to top FAB — visible when scrolled down
             val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 3 } }
             AnimatedVisibility(
                 visible = showFab,
@@ -115,9 +102,7 @@ fun TranscriptDetailScreen(
                 exit = scaleOut() + fadeOut()
             ) {
                 SmallFloatingActionButton(
-                    onClick = {
-                        transcriptuViewModel.onEvent(UserEvent.ScrollToTop(listState))
-                    },
+                    onClick = { transcriptuViewModel.onEvent(UserEvent.ScrollToTop(listState)) },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.primary
                 ) {
@@ -126,22 +111,64 @@ fun TranscriptDetailScreen(
             }
         }
     ) { innerPadding ->
-        when(val state = networkState){
+        when (val state = networkState) {
             TranscriptNetworkState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center){
-
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     CircularProgressIndicator()
                 }
-
             }
+
+            is TranscriptNetworkState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "Something went wrong",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = state.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        Button(onClick = onBackClick, shape = MaterialTheme.shapes.medium) {
+                            Text("Go Back")
+                        }
+                    }
+                }
+            }
+
             is TranscriptNetworkState.Success -> {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    // Search bar — animated
                     AnimatedVisibility(
                         visible = showSearchBar,
                         enter = expandVertically() + fadeIn(),
@@ -167,15 +194,13 @@ fun TranscriptDetailScreen(
                         )
                     }
 
-                    // Stats & controls bar
                     TranscriptMetaBar(
-                        thumbnailUrl = uiState.thumbnailUrl,
-                        language = uiState.language.displayName,
+                        uiState = uiState,
                         segmentCount = filteredSegments.size,
-                        totalCount = uiState.transcriptSegment.size,
                         showTimestamps = showTimestamps,
                         onTimestampToggle = { showTimestamps = !showTimestamps }
                     )
+
 
                     if (uiState.isLoading) {
                         TranscriptLoadingSkeleton()
@@ -189,45 +214,31 @@ fun TranscriptDetailScreen(
                                 .padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            if (showTimestamps && !uiState.isTranscriptNotAvailable){
-                                items(
-                                    items = filteredSegments,
-                                ) { segment ->
-                                    if (segment.text != null){
+                            if (showTimestamps && !uiState.isTranscriptNotAvailable) {
+                                items(filteredSegments) { segment ->
+                                    if (segment.text != null) {
                                         TranscriptSegmentCard(
                                             segment = segment,
-                                            showTimestamp = showTimestamps,
+                                            showTimestamp = true,
                                             modifier = Modifier
                                         )
                                     }
                                 }
-                            }else{
+                            } else {
                                 item {
                                     PlainTranscriptCard(
                                         transcript = plainTranscript,
                                         modifier = Modifier
-
                                     )
                                 }
-
                             }
-
-
                         }
                     }
                 }
             }
-            is TranscriptNetworkState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center){
-                    Text(state.error,
-                        fontSize = 24.sp)
-                }
-            }
-        }
-
         }
     }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -238,6 +249,7 @@ private fun TranscriptTopBar(
     onCopyClick: () -> Unit,
     onShareClick: () -> Unit,
     onSearchClick: () -> Unit,
+    copySuccess: Boolean,
 ) {
     TopAppBar(
         navigationIcon = {
@@ -250,9 +262,9 @@ private fun TranscriptTopBar(
         title = {
             Column(modifier = Modifier.padding(start = 4.dp)) {
                 Text(
-                    text = title,
+                    text = title.ifBlank { "Transcript" },
                     style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -274,16 +286,17 @@ private fun TranscriptTopBar(
                 onClick = onSearchClick
             )
             AppIconButton(
-                icon = Icons.Outlined.ContentCopy,
+                icon = if (copySuccess) Icons.Outlined.CheckCircle else Icons.Outlined.ContentCopy,
                 contentDescription = "Copy all transcript",
                 onClick = onCopyClick,
-                tint = MaterialTheme.colorScheme.onSurface
+                tint = if (copySuccess) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface
             )
-            AppIconButton(
-                icon = Icons.Outlined.Share,
-                contentDescription = "Share transcript",
-                onClick = onShareClick
-            )
+//            AppIconButton(
+//                icon = Icons.Outlined.Share,
+//                contentDescription = "Share transcript",
+//                onClick = onShareClick
+//            )
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background
@@ -293,27 +306,31 @@ private fun TranscriptTopBar(
 
 @Composable
 private fun TranscriptMetaBar(
-    language: String,
     segmentCount: Int,
-    totalCount: Int,
     showTimestamps: Boolean,
     onTimestampToggle: () -> Unit,
-    thumbnailUrl: String?,
+    uiState: TranscriptDetailUiState,
 ) {
+    val thumbnailUrl = remember { uiState.thumbnailUrl }
+    val language = remember { uiState.language.displayName }
+    val totalCount = remember { uiState.transcriptSegment.size }
+    val showMetaBarRow = remember { !uiState.transcriptSegment.isEmpty() }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-
-            if (thumbnailUrl != null){
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (thumbnailUrl != null) {
                 AsyncImage(
-                    model =thumbnailUrl,
+                    model = thumbnailUrl,
                     contentDescription = "Video Thumbnail",
                 )
             }
+
 
             Row(
                 modifier = Modifier
@@ -322,11 +339,37 @@ private fun TranscriptMetaBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                if (uiState.isTranscriptNotAvailable && uiState.apiErrorMessage.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Outlined.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = uiState.apiErrorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+                if (showMetaBarRow){
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Language badge
                     Surface(
                         shape = MaterialTheme.shapes.extraSmall,
                         color = MaterialTheme.colorScheme.primaryContainer
@@ -346,7 +389,6 @@ private fun TranscriptMetaBar(
                     )
                 }
 
-                // Timestamp toggle chip
                 FilterChip(
                     selected = showTimestamps,
                     onClick = onTimestampToggle,
@@ -362,6 +404,7 @@ private fun TranscriptMetaBar(
                     }
                 )
             }
+        }
         }
     }
 }
@@ -391,7 +434,6 @@ private fun SkeletonSegmentRow(lineCount: Int) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Timestamp skeleton
             ShimmerBox(width = 60.dp, height = 24.dp, shape = MaterialTheme.shapes.extraSmall)
             Spacer(Modifier.width(12.dp))
             Column(
@@ -400,8 +442,7 @@ private fun SkeletonSegmentRow(lineCount: Int) {
             ) {
                 repeat(lineCount) { i ->
                     ShimmerBox(
-                        width = if (i == lineCount - 1)
-                            (60..90).random().dp else Dp.Infinity,
+                        width = if (i == lineCount - 1) 120.dp else 0.dp,
                         height = 14.dp,
                         fillMaxWidth = i < lineCount - 1
                     )
@@ -432,7 +473,7 @@ private fun ShimmerBox(
         modifier = if (fillMaxWidth) Modifier
             .fillMaxWidth()
             .height(height)
-                   else Modifier
+        else Modifier
             .width(width)
             .height(height),
         shape = shape,
