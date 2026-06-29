@@ -1,5 +1,6 @@
-package com.transcriptapp.ui.screens
+package com.example.transcriptu.presentation.screens
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -10,76 +11,90 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import com.example.transcriptu.data.modal.Transcript
+import com.example.transcriptu.presentation.reusablecomponents.PlainTranscriptCard
 import com.transcriptapp.ui.components.*
 
-/**
- * UiState for the transcript detail screen.
- */
 data class TranscriptDetailUiState(
     val videoTitle: String = "",
+    val description: String = "",
+    val thumbnailUrl: String? = null,
+    val videoUrl: String = "",
     val channelName: String = "",
     val language: TranscriptLanguage = SupportedLanguages.first(),
-    val hasTimestamps: Boolean = true,
-    val segments: List<TranscriptSegment> = emptyList(),
-    val isLoading: Boolean = false,
-    val isCopied: Boolean = false,
+    val transcriptSegment: List<Transcript> = emptyList(),
+    val isLoading: Boolean = true,
+    val isTranscriptNotAvailable: Boolean = false,
+    val apiErrorMessage: String = ""
 )
 
-/**
- * TranscriptDetailScreen — Full transcript viewer.
- *
- * Shows the fetched transcript with segment cards.
- * Users can copy, share, or toggle timestamp visibility.
- * Top bar has a back button to return to HomeScreen.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TranscriptDetailScreen(
-    uiState: TranscriptDetailUiState,
     onBackClick: () -> Unit,
-    onCopyAllClick: () -> Unit,
-    onShareClick: () -> Unit,
-    onTimestampClick: (Long) -> Unit,
-    modifier: Modifier = Modifier,
+    onShareClick: () -> Unit = {},
+    onTimestampClick: (Long) -> Unit = {},
+    transcriptuViewModel: TranscriptuViewModel,
 ) {
-    var showTimestamps by remember { mutableStateOf(uiState.hasTimestamps) }
+    val uiState by transcriptuViewModel.transcriptDetailUiState.collectAsStateWithLifecycle()
+    val networkState by transcriptuViewModel.networkUiState.collectAsStateWithLifecycle()
+    val copySuccess by transcriptuViewModel.copySuccess.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
+    var showTimestamps by remember { mutableStateOf(false) }
 
-    val filteredSegments = remember(uiState.segments, searchQuery) {
-        if (searchQuery.isBlank()) uiState.segments
-        else uiState.segments.filter {
-            it.text.contains(searchQuery, ignoreCase = true)
+    val filteredSegments = remember(uiState.transcriptSegment, searchQuery) {
+        if (searchQuery.isBlank()) uiState.transcriptSegment
+        else uiState.transcriptSegment.filter {
+            it.text?.contains(searchQuery, ignoreCase = true) ?: false
         }
     }
 
+    val plainTranscript = remember( uiState, filteredSegments) {
+            if (uiState.isTranscriptNotAvailable) {
+                uiState.description
+            } else {
+                filteredSegments.joinToString(" ") { it.text.toString() }
+            }
+    }
+
+    Log.d("description", plainTranscript)
     val listState = rememberLazyListState()
 
+
     Scaffold(
-        modifier = modifier,
+        modifier = Modifier.fillMaxWidth(),
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TranscriptTopBar(
                 title = uiState.videoTitle,
                 channelName = uiState.channelName,
                 onBackClick = onBackClick,
-                onCopyClick = onCopyAllClick,
+                onCopyClick = {
+                    transcriptuViewModel.copyTranscript(context, showTimestamps)
+                },
                 onShareClick = onShareClick,
                 onSearchClick = { showSearchBar = !showSearchBar },
-                isCopied = uiState.isCopied
+                copySuccess = copySuccess
             )
         },
         floatingActionButton = {
-            // Scroll to top FAB — visible when scrolled down
             val showFab by remember { derivedStateOf { listState.firstVisibleItemIndex > 3 } }
             AnimatedVisibility(
                 visible = showFab,
@@ -87,9 +102,7 @@ fun TranscriptDetailScreen(
                 exit = scaleOut() + fadeOut()
             ) {
                 SmallFloatingActionButton(
-                    onClick = {
-                        // In MVVM layer, call coroutineScope.launch { listState.scrollToItem(0) }
-                    },
+                    onClick = { transcriptuViewModel.onEvent(UserEvent.ScrollToTop(listState)) },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.primary
                 ) {
@@ -98,69 +111,128 @@ fun TranscriptDetailScreen(
             }
         }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            // Search bar — animated
-            AnimatedVisibility(
-                visible = showSearchBar,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                AppTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = "Search transcript...",
-                    leadingIcon = Icons.Outlined.Search,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    trailingContent = if (searchQuery.isNotEmpty()) {
-                        {
-                            AppIconButton(
-                                icon = Icons.Outlined.Close,
-                                contentDescription = "Clear search",
-                                onClick = { searchQuery = "" }
-                            )
-                        }
-                    } else null
-                )
+        when (val state = networkState) {
+            TranscriptNetworkState.Loading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
 
-            // Stats & controls bar
-            TranscriptMetaBar(
-                language = uiState.language.displayName,
-                segmentCount = filteredSegments.size,
-                totalCount = uiState.segments.size,
-                showTimestamps = showTimestamps,
-                onTimestampToggle = { showTimestamps = !showTimestamps }
-            )
-
-            if (uiState.isLoading) {
-                TranscriptLoadingSkeleton()
-            } else if (filteredSegments.isEmpty() && searchQuery.isNotBlank()) {
-                EmptySearchState(query = searchQuery)
-            } else {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(
-                        start = 20.dp,
-                        top = 8.dp,
-                        end = 100.dp
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+            is TranscriptNetworkState.Error -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    items(
-                        items = filteredSegments,
-                        key = { it.id }
-                    ) { segment ->
-                        TranscriptSegmentCard(
-                            segment = segment,
-                            showTimestamp = showTimestamps,
-                            onTimestampClick = onTimestampClick
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(48.dp)
                         )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "Something went wrong",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.errorContainer
+                        ) {
+                            Text(
+                                text = state.error,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(16.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                        Spacer(Modifier.height(20.dp))
+                        Button(onClick = onBackClick, shape = MaterialTheme.shapes.medium) {
+                            Text("Go Back")
+                        }
+                    }
+                }
+            }
+
+            is TranscriptNetworkState.Success -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                ) {
+                    AnimatedVisibility(
+                        visible = showSearchBar,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        AppTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = "Search transcript...",
+                            leadingIcon = Icons.Outlined.Search,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                            trailingContent = if (searchQuery.isNotEmpty()) {
+                                {
+                                    AppIconButton(
+                                        icon = Icons.Outlined.Close,
+                                        contentDescription = "Clear search",
+                                        onClick = { searchQuery = "" }
+                                    )
+                                }
+                            } else null
+                        )
+                    }
+
+                    TranscriptMetaBar(
+                        uiState = uiState,
+                        segmentCount = filteredSegments.size,
+                        showTimestamps = showTimestamps,
+                        onTimestampToggle = { showTimestamps = !showTimestamps }
+                    )
+
+
+                    if (uiState.isLoading) {
+                        TranscriptLoadingSkeleton()
+                    } else if (filteredSegments.isEmpty() && searchQuery.isNotBlank()) {
+                        EmptySearchState(query = searchQuery)
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            if (showTimestamps && !uiState.isTranscriptNotAvailable) {
+                                items(filteredSegments) { segment ->
+                                    if (segment.text != null) {
+                                        TranscriptSegmentCard(
+                                            segment = segment,
+                                            showTimestamp = true,
+                                            modifier = Modifier
+                                        )
+                                    }
+                                }
+                            } else {
+                                item {
+                                    PlainTranscriptCard(
+                                        transcript = plainTranscript,
+                                        modifier = Modifier
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -177,12 +249,12 @@ private fun TranscriptTopBar(
     onCopyClick: () -> Unit,
     onShareClick: () -> Unit,
     onSearchClick: () -> Unit,
-    isCopied: Boolean,
+    copySuccess: Boolean,
 ) {
     TopAppBar(
         navigationIcon = {
             AppIconButton(
-                icon = Icons.Outlined.ArrowBack,
+                icon = Icons.AutoMirrored.Outlined.ArrowBack,
                 contentDescription = "Go back",
                 onClick = onBackClick
             )
@@ -190,9 +262,9 @@ private fun TranscriptTopBar(
         title = {
             Column(modifier = Modifier.padding(start = 4.dp)) {
                 Text(
-                    text = title,
+                    text = title.ifBlank { "Transcript" },
                     style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -214,17 +286,17 @@ private fun TranscriptTopBar(
                 onClick = onSearchClick
             )
             AppIconButton(
-                icon = if (isCopied) Icons.Outlined.CheckCircle else Icons.Outlined.ContentCopy,
+                icon = if (copySuccess) Icons.Outlined.CheckCircle else Icons.Outlined.ContentCopy,
                 contentDescription = "Copy all transcript",
                 onClick = onCopyClick,
-                tint = if (isCopied) MaterialTheme.colorScheme.primary
-                       else MaterialTheme.colorScheme.onSurface
+                tint = if (copySuccess) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurface
             )
-            AppIconButton(
-                icon = Icons.Outlined.Share,
-                contentDescription = "Share transcript",
-                onClick = onShareClick
-            )
+//            AppIconButton(
+//                icon = Icons.Outlined.Share,
+//                contentDescription = "Share transcript",
+//                onClick = onShareClick
+//            )
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.background
@@ -234,62 +306,105 @@ private fun TranscriptTopBar(
 
 @Composable
 private fun TranscriptMetaBar(
-    language: String,
     segmentCount: Int,
-    totalCount: Int,
     showTimestamps: Boolean,
     onTimestampToggle: () -> Unit,
+    uiState: TranscriptDetailUiState,
 ) {
+    val thumbnailUrl = remember { uiState.thumbnailUrl }
+    val language = remember { uiState.language.displayName }
+    val totalCount = remember { uiState.transcriptSegment.size }
+    val showMetaBarRow = remember { !uiState.transcriptSegment.isEmpty() }
+
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Language badge
-                Surface(
-                    shape = MaterialTheme.shapes.extraSmall,
-                    color = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Text(
-                        text = language,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                    )
-                }
-                Text(
-                    text = if (segmentCount == totalCount) "$totalCount segments"
-                           else "$segmentCount / $totalCount",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (thumbnailUrl != null) {
+                AsyncImage(
+                    model = thumbnailUrl,
+                    contentDescription = "Video Thumbnail",
                 )
             }
 
-            // Timestamp toggle chip
-            FilterChip(
-                selected = showTimestamps,
-                onClick = onTimestampToggle,
-                label = {
-                    Text("Timestamps", style = MaterialTheme.typography.labelSmall)
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.AccessTime,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (uiState.isTranscriptNotAvailable && uiState.apiErrorMessage.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier
+                            .fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Outlined.ErrorOutline,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = uiState.apiErrorMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+                if (showMetaBarRow){
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        shape = MaterialTheme.shapes.extraSmall,
+                        color = MaterialTheme.colorScheme.primaryContainer
+                    ) {
+                        Text(
+                            text = language,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                    Text(
+                        text = if (segmentCount == totalCount) "$totalCount segments"
+                        else "$segmentCount / $totalCount",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-            )
+
+                FilterChip(
+                    selected = showTimestamps,
+                    onClick = onTimestampToggle,
+                    label = {
+                        Text("Timestamps", style = MaterialTheme.typography.labelSmall)
+                    },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.AccessTime,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                )
+            }
+        }
         }
     }
 }
@@ -319,7 +434,6 @@ private fun SkeletonSegmentRow(lineCount: Int) {
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.Top
         ) {
-            // Timestamp skeleton
             ShimmerBox(width = 60.dp, height = 24.dp, shape = MaterialTheme.shapes.extraSmall)
             Spacer(Modifier.width(12.dp))
             Column(
@@ -328,8 +442,7 @@ private fun SkeletonSegmentRow(lineCount: Int) {
             ) {
                 repeat(lineCount) { i ->
                     ShimmerBox(
-                        width = if (i == lineCount - 1)
-                            (60..90).random().dp else Dp.Infinity,
+                        width = if (i == lineCount - 1) 120.dp else 0.dp,
                         height = 14.dp,
                         fillMaxWidth = i < lineCount - 1
                     )
@@ -357,8 +470,12 @@ private fun ShimmerBox(
         label = "shimmer_alpha"
     )
     Surface(
-        modifier = if (fillMaxWidth) Modifier.fillMaxWidth().height(height)
-                   else Modifier.width(width).height(height),
+        modifier = if (fillMaxWidth) Modifier
+            .fillMaxWidth()
+            .height(height)
+        else Modifier
+            .width(width)
+            .height(height),
         shape = shape,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha * 0.12f)
     ) {}

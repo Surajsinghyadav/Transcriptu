@@ -1,69 +1,66 @@
-package com.transcriptapp.ui.screens
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+package com.example.transcriptu.presentation.screens
+
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.transcriptapp.ui.components.*
+import kotlinx.coroutines.delay
+import org.koin.androidx.compose.koinViewModel
+import kotlin.time.Duration.Companion.milliseconds
 
-/**
- * Enum for the two toggle options at the top of the input form.
- */
 enum class TimestampOption { WITH_TIMESTAMPS, WITHOUT_TIMESTAMPS }
 
-/**
- * Data holder representing the state surfaced to this screen.
- * (Drive this from your ViewModel in the MVVM layer.)
- */
-data class HomeScreenUiState(
-    val urlInput: String = "",
-    val selectedLanguage: TranscriptLanguage = SupportedLanguages.first(),
-    val timestampOption: TimestampOption = TimestampOption.WITHOUT_TIMESTAMPS,
-    val isLoading: Boolean = false,
-    val errorMessage: String? = null,
-    val urlError: String? = null,
-)
-
-/**
- * HomeScreen — The main landing screen.
- *
- * Users paste a YouTube URL here, choose language and timestamp preference,
- * then hit "Fetch Transcript".
- *
- * Navigation: onFetchSuccess leads to TranscriptDetailScreen.
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    uiState: HomeScreenUiState,
-    onUrlChange: (String) -> Unit,
-    onLanguageChange: (TranscriptLanguage) -> Unit,
-    onTimestampToggle: (TimestampOption) -> Unit,
-    onFetchClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    transcriptuViewModel: TranscriptuViewModel = koinViewModel(),
+    modifier: Modifier,
+    goToTranscriptScreen: () -> Unit,
+    goToSettings: () -> Unit,
 ) {
     var showLanguagePicker by remember { mutableStateOf(false) }
+    val uiState by transcriptuViewModel.homeUiState.collectAsState()
+    val apiKey by transcriptuViewModel.savedApiKey.collectAsStateWithLifecycle(null)
+    var showMissingKeyDialog by remember { mutableStateOf(false) }
+
+    if (showMissingKeyDialog) {
+        ApiKeyMissingDialog(
+            onGoToSettings = {
+                goToSettings()
+            },
+            onDismiss = {
+                showMissingKeyDialog = false
+            }
+        )
+    }
+    LaunchedEffect(apiKey) {
+        delay(30000.milliseconds)
+        showMissingKeyDialog = apiKey == null
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
-        topBar = { HomeTopBar() }
+        topBar = {
+            HomeTopBar(onSettingsClick = goToSettings)
+        }
     ) { innerPadding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -71,48 +68,78 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            Spacer(Modifier.height(8.dp))
-
-            // Hero section
             HeroSection()
-
             Spacer(Modifier.height(28.dp))
-
-            // Input card
             InputCard(
                 uiState = uiState,
-                onUrlChange = onUrlChange,
-                onLanguagePickerOpen = { showLanguagePicker = true },
-                onTimestampToggle = onTimestampToggle,
-                onFetchClick = onFetchClick,
+                apiKey = apiKey,
+                goToSettings = goToSettings,
+                userEvent = transcriptuViewModel::onEvent,
+                showLanguagePicker = { showLanguagePicker = true },
+                goToTranscriptScreen = goToTranscriptScreen
             )
-
             Spacer(Modifier.height(24.dp))
-
-            // Quick tips section
             QuickTipsSection()
-
             Spacer(Modifier.height(24.dp))
         }
     }
 
-    // Language picker bottom sheet
     if (showLanguagePicker) {
         LanguagePickerSheet(
             selectedLanguage = uiState.selectedLanguage,
-            onLanguageSelected = onLanguageChange,
+            onLanguageSelected = {
+                showLanguagePicker = false
+                transcriptuViewModel.onEvent(UserEvent.LanguageSelected(it))
+            },
             onDismiss = { showLanguagePicker = false }
         )
     }
 }
 
+@Composable
+private fun ApiKeyMissingDialog(
+    onGoToSettings: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(Icons.Outlined.Key, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        },
+        title = {
+            Text("API Key Required", style = MaterialTheme.typography.headlineSmall)
+        },
+        text = {
+            Text(
+                "To fetch YouTube transcripts, you need a free RapidAPI key. Go to Settings to add yours — it only takes a minute.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onGoToSettings,
+                shape = MaterialTheme.shapes.medium
+            ) {
+                Icon(Icons.Outlined.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Go to Settings")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Later")
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeTopBar() {
+private fun HomeTopBar(onSettingsClick: () -> Unit) {
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // App logo mark
                 Surface(
                     shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.primary,
@@ -129,7 +156,7 @@ private fun HomeTopBar() {
                 }
                 Spacer(Modifier.width(10.dp))
                 Text(
-                    text = "TranscriptAI",
+                    text = "TranscriptU",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -140,7 +167,7 @@ private fun HomeTopBar() {
             AppIconButton(
                 icon = Icons.Outlined.Settings,
                 contentDescription = "Settings",
-                onClick = { /* Navigate to Settings */ }
+                onClick = onSettingsClick
             )
         },
         colors = TopAppBarDefaults.topAppBarColors(
@@ -169,11 +196,12 @@ private fun HeroSection() {
 
 @Composable
 private fun InputCard(
-    uiState: HomeScreenUiState,
-    onUrlChange: (String) -> Unit,
-    onLanguagePickerOpen: () -> Unit,
-    onTimestampToggle: (TimestampOption) -> Unit,
-    onFetchClick: () -> Unit,
+    uiState: HomeScreenInputs,
+    userEvent: (UserEvent) -> Unit,
+    showLanguagePicker: () -> Unit,
+    goToTranscriptScreen: () -> Unit,
+    apiKey: String?,
+    goToSettings: () -> Unit,
 ) {
     Surface(
         shape = MaterialTheme.shapes.extraLarge,
@@ -183,21 +211,18 @@ private fun InputCard(
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
 
-            // URL field
             AppTextField(
                 value = uiState.urlInput,
-                onValueChange = onUrlChange,
+                onValueChange = { userEvent(UserEvent.UrlInputChanged(it)) },
                 placeholder = "https://youtube.com/watch?v=...",
                 label = "YouTube URL",
                 leadingIcon = Icons.Outlined.Link,
-                isError = uiState.urlError != null,
-                errorMessage = uiState.urlError,
                 trailingContent = if (uiState.urlInput.isNotEmpty()) {
                     {
                         AppIconButton(
                             icon = Icons.Outlined.Close,
                             contentDescription = "Clear URL",
-                            onClick = { onUrlChange("") }
+                            onClick = { userEvent(UserEvent.UrlInputChanged("")) }
                         )
                     }
                 } else null,
@@ -205,14 +230,13 @@ private fun InputCard(
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { onFetchClick() })
+                keyboardActions = KeyboardActions(onDone = { userEvent(UserEvent.FetchTranscriptClicked) })
             )
 
             Spacer(Modifier.height(16.dp))
-            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(Modifier.height(16.dp))
 
-            // Language selector row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -232,132 +256,30 @@ private fun InputCard(
                     )
                 }
                 OutlinedButton(
-                    onClick = onLanguagePickerOpen,
+                    onClick = showLanguagePicker,
                     shape = MaterialTheme.shapes.medium,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Icon(
-                        Icons.Outlined.Translate,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Icon(Icons.Outlined.Translate, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Change", style = MaterialTheme.typography.labelLarge)
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-            Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(Modifier.height(16.dp))
-
-            // Timestamp toggle
-            Text(
-                text = "Include timestamps?",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(8.dp))
-            TimestampToggle(
-                selected = uiState.timestampOption,
-                onSelect = onTimestampToggle
-            )
-
             Spacer(Modifier.height(20.dp))
 
-            // Error message
-            AnimatedVisibility(visible = uiState.errorMessage != null) {
-                uiState.errorMessage?.let {
-                    ErrorBanner(message = it)
-                    Spacer(Modifier.height(12.dp))
-                }
-            }
-
-            // CTA button
             PrimaryButton(
                 text = "Fetch Transcript",
-                onClick = onFetchClick,
-                isLoading = uiState.isLoading,
-                leadingIcon = if (!uiState.isLoading) Icons.Outlined.Download else null,
+                onClick = {
+                    if (!apiKey.isNullOrBlank()){
+                        goToTranscriptScreen()
+                        userEvent(UserEvent.FetchTranscriptClicked)
+                    }else {
+                        goToSettings()
+                    }
+                },
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large
-            )
-        }
-    }
-}
-
-@Composable
-private fun TimestampToggle(
-    selected: TimestampOption,
-    onSelect: (TimestampOption) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        TimestampOption.values().forEach { option ->
-            val isSelected = selected == option
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(MaterialTheme.shapes.medium)
-                    .clickable { onSelect(option) }
-                    .padding(2.dp),
-                shape = MaterialTheme.shapes.medium,
-                color = if (isSelected) MaterialTheme.colorScheme.surface
-                        else MaterialTheme.colorScheme.surfaceVariant,
-                shadowElevation = if (isSelected) 2.dp else 0.dp
-            ) {
-                Row(
-                    modifier = Modifier.padding(vertical = 10.dp, horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = if (option == TimestampOption.WITH_TIMESTAMPS)
-                            Icons.Outlined.AccessTime else Icons.Outlined.TextFields,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary
-                               else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (option == TimestampOption.WITH_TIMESTAMPS)
-                            "With Timestamps" else "Text Only",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ErrorBanner(message: String) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.errorContainer
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.ErrorOutline,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.error,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onErrorContainer
             )
         }
     }
@@ -374,7 +296,7 @@ private fun QuickTipsSection() {
     val steps = listOf(
         Triple(Icons.Outlined.ContentPaste, "Paste URL", "Copy any YouTube video link and paste it above"),
         Triple(Icons.Outlined.Translate, "Choose Language", "Select the language of the video's transcript"),
-        Triple(Icons.Outlined.Article, "Get Transcript", "View the full transcript with clickable timestamps"),
+        Triple(Icons.AutoMirrored.Outlined.Article, "Get Transcript", "View the full transcript with clickable timestamps"),
     )
     steps.forEachIndexed { index, (icon, title, desc) ->
         StepRow(step = index + 1, icon = icon, title = title, description = desc)
@@ -385,7 +307,7 @@ private fun QuickTipsSection() {
 @Composable
 private fun StepRow(
     step: Int,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     title: String,
     description: String,
 ) {
@@ -393,7 +315,6 @@ private fun StepRow(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Step number badge
         Surface(
             modifier = Modifier.size(40.dp),
             shape = MaterialTheme.shapes.medium,
@@ -410,16 +331,8 @@ private fun StepRow(
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = description,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(text = title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Surface(
             shape = MaterialTheme.shapes.small,
@@ -427,12 +340,7 @@ private fun StepRow(
             modifier = Modifier.size(36.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
             }
         }
     }

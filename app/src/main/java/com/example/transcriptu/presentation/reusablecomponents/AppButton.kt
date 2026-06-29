@@ -1,6 +1,8 @@
 package com.transcriptapp.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowCircleDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -16,39 +18,30 @@ fun PrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    leadingIcon: ImageVector? = null,
-    isLoading: Boolean = false,
     enabled: Boolean = true,
     shape: Shape = MaterialTheme.shapes.medium,
 ) {
     Button(
         onClick = onClick,
         modifier = modifier.height(52.dp),
-        enabled = enabled && !isLoading,
+        enabled = enabled,
         shape = shape,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 0.dp)
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                color = MaterialTheme.colorScheme.onPrimary,
-                strokeWidth = 2.dp
+        Row() {
+            Icon(
+                imageVector = Icons.Default.ArrowCircleDown,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
-        } else {
-            if (leadingIcon != null) {
-                Icon(
-                    imageVector = leadingIcon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge
-            )
+            Spacer(modifier = Modifier.width(8.dp))
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge
+        )
     }
+
 }
 
 /**
