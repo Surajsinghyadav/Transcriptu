@@ -4,6 +4,19 @@ A modern, native Android application built entirely with **Jetpack Compose** tha
 
 Transcriptu features a clean, intuitive user interface and leverages a robust, scalable architecture under the hood, making it a fast and reliable tool for content creators, students, and researchers.
 
+## 📸 Screenshots
+
+<!-- REPLACE THE LINKS BELOW WITH YOUR ACTUAL IMAGE LINKS -->
+<div align="center">
+  
+  <img src="https://github.com/user-attachments/assets/1067bcb6-70dc-461d-b2f7-d9ac56475286" width="22%" alt="Language Selection" />
+
+  <img src="https://github.com/user-attachments/assets/2847d2e4-9390-4390-bfc6-a14d01df0746" width="22%" alt="Language Selection" />
+  <img src="https://github.com/user-attachments/assets/68348de1-23b7-4944-bf72-88cdf1346968" width="22%" alt="Home Screen" />
+
+  <img src="https://github.com/user-attachments/assets/19c245e7-71d6-442c-b6df-7d5962e76cb2" width="22%" alt="Transcript View" />
+</div>
+
 ## 🎥 App Demo
 
 <!-- REPLACE THE LINK BELOW WITH YOUR ACTUAL VIDEO LINK -->
@@ -17,18 +30,7 @@ Transcriptu features a clean, intuitive user interface and leverages a robust, s
   <em>👆 Click to watch full demo on YouTube</em>
 </div>
 
-## 📸 Screenshots
 
-<!-- REPLACE THE LINKS BELOW WITH YOUR ACTUAL IMAGE LINKS -->
-<div align="center">
-  
-  <img src="https://github.com/user-attachments/assets/1067bcb6-70dc-461d-b2f7-d9ac56475286" width="22%" alt="Language Selection" />
-
-  <img src="https://github.com/user-attachments/assets/2847d2e4-9390-4390-bfc6-a14d01df0746" width="22%" alt="Language Selection" />
-  <img src="https://github.com/user-attachments/assets/68348de1-23b7-4944-bf72-88cdf1346968" width="22%" alt="Home Screen" />
-
-  <img src="https://github.com/user-attachments/assets/19c245e7-71d6-442c-b6df-7d5962e76cb2" width="22%" alt="Transcript View" />
-</div>
 
 ## ✨ Key Features
 
