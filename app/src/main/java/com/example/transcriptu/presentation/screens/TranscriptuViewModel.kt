@@ -18,6 +18,7 @@ import com.example.transcriptu.data.modal.TimeStampTranscript
 import com.transcriptapp.ui.components.SupportedLanguages
 import com.transcriptapp.ui.components.TranscriptLanguage
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,6 +29,52 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import retrofit2.HttpException
+
+private val HTML_ENTITY_REGEX = Regex("&(#?[a-zA-Z0-9]+);")
+private val NAMED_ENTITIES = mapOf(
+    "quot" to "\"",
+    "amp" to "&",
+    "apos" to "'",
+    "lt" to "<",
+    "gt" to ">",
+    "nbsp" to " ",
+    "middot" to "·",
+    "ndash" to "–",
+    "mdash" to "—",
+    "lsquo" to "‘",
+    "rsquo" to "’",
+    "ldquo" to "“",
+    "rdquo" to "”",
+    "bull" to "•",
+    "hellip" to "…"
+)
+
+fun String.cleanTranscript(): String {
+    if (this.isBlank()) return this
+    
+    val decoded = HTML_ENTITY_REGEX.replace(this) { matchResult ->
+        val entity = matchResult.groupValues[1]
+        try {
+            when {
+                entity.startsWith("#x", ignoreCase = true) -> {
+                    entity.substring(2).toInt(16).toChar().toString()
+                }
+                entity.startsWith("#") -> {
+                    entity.substring(1).toInt().toChar().toString()
+                }
+                else -> {
+                    NAMED_ENTITIES[entity.lowercase()] ?: matchResult.value
+                }
+            }
+        } catch (e: Exception) {
+            matchResult.value
+        }
+    }
+
+    return decoded
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
 
 fun Double.toYouTubeTimestamp(): String {
     val totalSeconds = this.toLong()
@@ -53,11 +100,21 @@ class TranscriptuViewModel(
 ) : ViewModel() {
 
 
+    val _isReady = MutableStateFlow(false)
+    val isReady = _isReady.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            delay(500)
+            _isReady.value = true
+        }
+    }
+
     companion object {
         val API_KEY_PREFERENCE_KEY = stringPreferencesKey("Api_Key")
     }
 
-    private val _networkUiState = MutableStateFlow<TranscriptNetworkState>(TranscriptNetworkState.Success(null))
+    private val _networkUiState = MutableStateFlow<TranscriptNetworkState>(TranscriptNetworkState.Success)
     val networkUiState = _networkUiState.asStateFlow()
 
     private val _homeUiState = MutableStateFlow(HomeScreenInputs())
@@ -158,7 +215,7 @@ class TranscriptuViewModel(
                                 )
                             }
                             Log.d("description", metaData.description ?: "its empty chit")
-                            _networkUiState.update { TranscriptNetworkState.Success(null) }
+                            _networkUiState.update { TranscriptNetworkState.Success }
                         } catch (e: Exception) {
                             _networkUiState.update { TranscriptNetworkState.Error(resolveError(e)) }
                         }
@@ -169,7 +226,7 @@ class TranscriptuViewModel(
                                 _transcriptDetailUiState.update { state ->
                                     val detectedLang = transcript.transcript.firstOrNull()?.lang
                                     state.copy(
-                                        transcriptSegment = transcript.transcript,
+                                        transcriptSegment = transcript.transcript.map { it.copy(text = it.text?.cleanTranscript()) },
                                         language = SupportedLanguages.find { it.code == detectedLang }
                                             ?: SupportedLanguages.first(),
                                         isLoading = false
@@ -234,7 +291,7 @@ data class HomeScreenInputs(
 
 sealed class TranscriptNetworkState {
     data object Loading : TranscriptNetworkState()
-    data class Success(val transcript: TimeStampTranscript?) : TranscriptNetworkState()
+    data object Success : TranscriptNetworkState()
     data class Error(val error: String) : TranscriptNetworkState()
 }
 

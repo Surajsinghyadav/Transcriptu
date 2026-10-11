@@ -2,4 +2,11 @@
 <resources>
 
     <style name="Theme.Transcriptu" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <style name="Theme.App.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenAnimatedIcon">@drawable/animated_youtube_logo</item>
+        <item name="windowSplashScreenBackground">@color/black</item>
+        <item name="postSplashScreenTheme">@style/Theme.Transcriptu</item>
+    </style>
+
 </resources>

@@ -3,12 +3,15 @@ package com.transcriptapp.ui.components
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowCircleDown
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.example.transcriptu.ui.theme.Primary
 
 /**
  * Primary filled button with optional leading icon and loading state.
@@ -23,14 +26,19 @@ fun PrimaryButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.height(52.dp),
+        modifier = modifier.padding(horizontal = 12.dp).height(52.dp),
         enabled = enabled,
         shape = shape,
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 0.dp)
+        colors = ButtonColors(
+            containerColor = Primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     ) {
         Row() {
             Icon(
-                imageVector = Icons.Default.ArrowCircleDown,
+                imageVector = Icons.Default.Search,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
@@ -118,7 +126,7 @@ fun AppIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+    tint: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     IconButton(
         onClick = onClick,

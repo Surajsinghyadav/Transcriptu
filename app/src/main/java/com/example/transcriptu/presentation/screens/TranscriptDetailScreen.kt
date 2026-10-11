@@ -1,6 +1,7 @@
 package com.example.transcriptu.presentation.screens
 
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -58,6 +59,7 @@ fun TranscriptDetailScreen(
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
     var showTimestamps by remember { mutableStateOf(false) }
+    val isSearchAndCopyVisible = networkState is TranscriptNetworkState.Success && uiState.transcriptSegment.isNotEmpty()
 
     val filteredSegments = remember(uiState.transcriptSegment, searchQuery) {
         if (searchQuery.isBlank()) uiState.transcriptSegment
@@ -91,7 +93,8 @@ fun TranscriptDetailScreen(
                 },
                 onShareClick = onShareClick,
                 onSearchClick = { showSearchBar = !showSearchBar },
-                copySuccess = copySuccess
+                copySuccess = copySuccess,
+                isSearchAndCopyVisible = isSearchAndCopyVisible
             )
         },
         floatingActionButton = {
@@ -194,12 +197,13 @@ fun TranscriptDetailScreen(
                         )
                     }
 
-                    TranscriptMetaBar(
-                        uiState = uiState,
-                        segmentCount = filteredSegments.size,
-                        showTimestamps = showTimestamps,
-                        onTimestampToggle = { showTimestamps = !showTimestamps }
-                    )
+                        TranscriptMetaBar(
+                            uiState = uiState,
+                            segmentCount = filteredSegments.size,
+                            showTimestamps = showTimestamps,
+                            onTimestampToggle = { showTimestamps = !showTimestamps }
+                        )
+
 
 
                     if (uiState.isLoading) {
@@ -250,7 +254,9 @@ private fun TranscriptTopBar(
     onShareClick: () -> Unit,
     onSearchClick: () -> Unit,
     copySuccess: Boolean,
+    isSearchAndCopyVisible: Boolean,
 ) {
+    val context = LocalContext.current
     TopAppBar(
         navigationIcon = {
             AppIconButton(
@@ -280,18 +286,23 @@ private fun TranscriptTopBar(
             }
         },
         actions = {
-            AppIconButton(
-                icon = Icons.Outlined.Search,
-                contentDescription = "Search in transcript",
-                onClick = onSearchClick
-            )
-            AppIconButton(
-                icon = if (copySuccess) Icons.Outlined.CheckCircle else Icons.Outlined.ContentCopy,
-                contentDescription = "Copy all transcript",
-                onClick = onCopyClick,
-                tint = if (copySuccess) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurface
-            )
+            if (isSearchAndCopyVisible){
+                AppIconButton(
+                    icon = Icons.Outlined.Search,
+                    contentDescription = "Search in transcript",
+                    onClick = onSearchClick
+                )
+                AppIconButton(
+                    icon = if (copySuccess) Icons.Outlined.CheckCircle else Icons.Outlined.ContentCopy,
+                    contentDescription = "Copy all transcript",
+                    onClick = {
+                        onCopyClick()
+                        Toast.makeText(context, "Transcript copied to clipboard", Toast.LENGTH_SHORT).show()
+                    },
+                    tint = if (copySuccess) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface
+                )
+            }
 //            AppIconButton(
 //                icon = Icons.Outlined.Share,
 //                contentDescription = "Share transcript",
@@ -311,10 +322,10 @@ private fun TranscriptMetaBar(
     onTimestampToggle: () -> Unit,
     uiState: TranscriptDetailUiState,
 ) {
-    val thumbnailUrl = remember { uiState.thumbnailUrl }
-    val language = remember { uiState.language.displayName }
-    val totalCount = remember { uiState.transcriptSegment.size }
-    val showMetaBarRow = remember { !uiState.transcriptSegment.isEmpty() }
+    val thumbnailUrl = uiState.thumbnailUrl
+    val language = uiState.language.displayName
+    val totalCount = uiState.transcriptSegment.size
+    val showMetaBarRow =  !uiState.transcriptSegment.isEmpty()
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -331,7 +342,7 @@ private fun TranscriptMetaBar(
                 )
             }
 
-
+            if (!uiState.isLoading && !uiState.isTranscriptNotAvailable ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -339,33 +350,7 @@ private fun TranscriptMetaBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (uiState.isTranscriptNotAvailable && uiState.apiErrorMessage.isNotBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Outlined.ErrorOutline,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = uiState.apiErrorMessage,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                        }
-                    }
-                }
-                if (showMetaBarRow){
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -382,8 +367,7 @@ private fun TranscriptMetaBar(
                         )
                     }
                     Text(
-                        text = if (segmentCount == totalCount) "$totalCount segments"
-                        else "$segmentCount / $totalCount",
+                        text = "$totalCount segments",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -405,6 +389,40 @@ private fun TranscriptMetaBar(
                 )
             }
         }
+            if (uiState.isTranscriptNotAvailable && uiState.apiErrorMessage.isNotBlank()) {
+                TranscriptErrorBanner(message = uiState.apiErrorMessage)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TranscriptErrorBanner(message: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        shape = MaterialTheme.shapes.medium,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.2f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified
+            )
         }
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.transcriptu.ui.theme.Primary
 import com.transcriptapp.ui.components.*
 import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
@@ -142,7 +143,7 @@ private fun HomeTopBar(onSettingsClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = MaterialTheme.shapes.small,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = Primary,
                     modifier = Modifier.size(28.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {

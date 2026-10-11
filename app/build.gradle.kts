@@ -25,6 +25,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -81,5 +82,6 @@ dependencies {
 
     implementation(libs.logging.interceptor)
     implementation(libs.androidx.datastore.preferences)
+    implementation("androidx.core:core-splashscreen:1.2.0")
 
 }

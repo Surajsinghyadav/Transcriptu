@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.transcriptu.ui.theme.Primary
 import com.transcriptapp.ui.components.AppIconButton
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -180,6 +181,12 @@ fun SettingsScreen(
                         },
                         enabled = apiKeyInput.isNotBlank() && apiKeyInput.trim() != apiKey,
                         shape = MaterialTheme.shapes.large,
+                        colors = ButtonColors(
+                            containerColor = Primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                            disabledContainerColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContentColor =  MaterialTheme.colorScheme.onPrimary
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp)
@@ -230,7 +237,7 @@ fun SettingsScreen(
                 Triple(
                     "Find YouTube Transcript API",
                     "Search for \"YouTube Transcript\" on RapidAPI and open the \"YouTube Transcript\" by Anoop.",
-                    "https://rapidapi.com/anoop/api/youtube-transcript3"
+                    "https://rapidapi.com/solid-api-solid-api-default/api/youtube-transcript3`"
                 ),
                 Triple(
                     "Subscribe to Free Plan",
